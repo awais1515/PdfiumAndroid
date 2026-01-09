@@ -65,7 +65,22 @@ afterEvaluate {
         publications {
             release(MavenPublication) {
                 if (isAndroid) {
-                    from components.release
+                    // AGP 8.x compatible - use components.release if available, otherwise use AAR artifact
+                    try {
+                        from components.release
+                    } catch (Exception e) {
+                        // Fallback: manually add AAR artifact
+                        def releaseVariant = android.libraryVariants.find { it.name == 'release' }
+                        if (releaseVariant) {
+                            def aarFile = releaseVariant.outputs.first().outputFile
+                            if (aarFile && aarFile.name.endsWith('.aar')) {
+                                artifact(aarFile) {
+                                    classifier = ''
+                                    builtBy releaseVariant.assembleProvider
+                                }
+                            }
+                        }
+                    }
                 } else {
                     from components.java
                 }
@@ -79,7 +94,7 @@ afterEvaluate {
 
                 pom {
                     name = PUBLISH_ARTIFACT_ID
-                    description = 'Fork of Barteksc Pdfium Android'
+                    description = 'Fork of Barteksc Pdfium Android with 16KB alignment support'
                     url = 'https://github.com/mhiew/PdfiumAndroid'
                     licenses {
                         license {
