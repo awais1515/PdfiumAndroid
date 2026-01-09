@@ -20,18 +20,13 @@ task javadoc(type: Javadoc) {
 
 afterEvaluate {
     javadoc.classpath += files(android.libraryVariants.collect { variant ->
-        variant.javaCompileProvider.get().classpath.files
+        variant.javaCompileProvider?.get()?.classpath?.files ?: []
     })
 }
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
     archiveClassifier.set('javadoc')
     from javadoc.destinationDir
-}
-
-artifacts {
-    archives sourcesJar
-    archives javadocJar
 }
 
 group = PUBLISH_GROUP_ID
@@ -65,29 +60,15 @@ afterEvaluate {
         publications {
             release(MavenPublication) {
                 if (isAndroid) {
-                    // AGP 8.x compatible - use components.release if available, otherwise use AAR artifact
-                    try {
-                        from components.release
-                    } catch (Exception e) {
-                        // Fallback: manually add AAR artifact
-                        def releaseVariant = android.libraryVariants.find { it.name == 'release' }
-                        if (releaseVariant) {
-                            def aarFile = releaseVariant.outputs.first().outputFile
-                            if (aarFile && aarFile.name.endsWith('.aar')) {
-                                artifact(aarFile) {
-                                    classifier = ''
-                                    builtBy releaseVariant.assembleProvider
-                                }
-                            }
-                        }
-                    }
+                    // For AGP 8.x, components.release should be available
+                    // JitPack compatibility: ensure release variant is built first
+                    from components.release
                 } else {
                     from components.java
                 }
                 artifact sourcesJar
                 artifact javadocJar
 
-                // Set within Library Gradle
                 groupId PUBLISH_GROUP_ID
                 artifactId PUBLISH_ARTIFACT_ID
                 version PUBLISH_VERSION
@@ -95,7 +76,7 @@ afterEvaluate {
                 pom {
                     name = PUBLISH_ARTIFACT_ID
                     description = 'Fork of Barteksc Pdfium Android with 16KB alignment support'
-                    url = 'https://github.com/mhiew/PdfiumAndroid'
+                    url = 'https://github.com/awais1515/PdfiumAndroid'
                     licenses {
                         license {
                             name = 'The Apache License, Version 2.0'
@@ -104,23 +85,24 @@ afterEvaluate {
                     }
                     developers {
                         developer {
-                            id = 'min'
-                            name = 'Min Hiew'
+                            id = 'awais1515'
+                            name = 'Awais'
                         }
                     }
                     scm {
-                        connection = 'scm:git:https://github.com/mhiew/'
-                        developerConnection = 'scm:git:ssh:github.com:mhiew/PdfiumAndroid.git'
-                        url = 'https://github.com/mhiew/PdfiumAndroid'
+                        connection = 'scm:git:https://github.com/awais1515/PdfiumAndroid'
+                        developerConnection = 'scm:git:ssh:github.com:awais1515/PdfiumAndroid.git'
+                        url = 'https://github.com/awais1515/PdfiumAndroid'
                     }
                 }
             }
         }
-        // The repository to publish to, Sonatype/MavenCentral
         repositories {
+            // Local Maven repository for JitPack
+            mavenLocal()
+            
+            // Maven Central (for manual publishing)
             maven {
-                // This is an arbitrary name, you may also use "mavencentral" or
-                // any other name that's descriptive for you
                 name = "sonatype"
                 url = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
                 credentials {
@@ -133,5 +115,8 @@ afterEvaluate {
 }
 
 signing {
-    sign publishing.publications
+    // Only sign if credentials are available
+    if (project.hasProperty('signing.keyId') && project.property('signing.keyId')) {
+        sign publishing.publications
+    }
 }
